@@ -17,6 +17,15 @@
     },
     "products": {
       "type": "json"
+    },
+    "number": {
+      "type": "string",
+      "required": true,
+      "minLength": 10,
+      "maxLength": 16
+    },
+    "email": {
+      "type": "email"
     }
   }
 }
