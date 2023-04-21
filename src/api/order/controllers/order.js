@@ -1,51 +1,45 @@
-("use strict");
+"use strict";
 const stripe = require("stripe")(process.env.STRIPE_KEY);
+const nodemailer = require("nodemailer");
+
 /**
  * order controller
  */
-
 const { createCoreController } = require("@strapi/strapi").factories;
 
-module.exports = createCoreController("api::order.order", ({ strapi }) => ({
-  async create(ctx) {
-    const { products } = ctx.request.body;
-    try {
-      const lineItems = await Promise.all(
-        products.map(async (product) => {
-          const item = await strapi
-            .service("api::product.product")
-            .findOne(product.id);
+module.exports = createCoreController("api::order.order");
 
-          return {
-            price_data: {
-              currency: "inr",
-              product_data: {
-                name: item.title,
-              },
-              unit_amount: Math.round(item.price * 100),
-            },
-            quantity: product.attributes.quantity,
-          };
-        })
-      );
+// Modify the create function to send email
+module.exports.create = async (ctx) => {
+  try {
+    // Create the order object
+    const order = await strapi.services.order.create(ctx.request.body);
 
-      const session = await stripe.checkout.sessions.create({
-        shipping_address_collection: { allowed_countries: ["IN"] },
-        payment_method_types: ["card"],
-        mode: "payment",
-        success_url: process.env.CLIENT_URL + "/success",
-        cancel_url: process.env.CLIENT_URL + "?success=false",
-        line_items: lineItems,
-      });
+    // Send the order object via email
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "your-email@example.com",
+        pass: "your-email-password",
+      },
+    });
 
-      await strapi
-        .service("api::order.order")
-        .create({ data: { products, stripeId: session.id } });
+    const mailOptions = {
+      from: "your-email@example.com",
+      to: "recipient-email@example.com",
+      subject: "New Order",
+      text: `A new order has been created:\n\n${JSON.stringify(order, null, 2)}`,
+    };
 
-      return { stripeSession: session };
-    } catch (error) {
-      ctx.response.status = 500;
-      return { error };
-    }
-  },
-}));
+    await transporter.sendMail(mailOptions);
+
+    // Return a success response
+    ctx.send({
+      message: "Order created successfully",
+      order,
+    });
+  } catch (error) {
+    // Return an error response
+    ctx.throw(500, "Failed to create order");
+  }
+};
