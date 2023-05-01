@@ -23,7 +23,7 @@
     },
     "price": {
       "type": "decimal",
-      "required": true,
+      "required": false,
       "min": 0
     },
     "featured": {
